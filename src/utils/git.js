@@ -1,75 +1,97 @@
 // @flow
 import spawn from 'projector-spawn';
 import * as path from 'path';
+import * as commits from './commits';
 
-// Parses lines that are in the form 'HASH message goes here'
-function parseCommitLine(line) {
-  // ignore first result, it is the whole pattern match
-  const [, hash, message] = line.match(/([^ ]+) (.+)/);
-  return { commit: hash, message };
+type SpawnOptions = {
+  cwd?: string,
+};
+
+type GitResults = {
+  stdout: string,
+  code: number,
+};
+
+async function git(
+  args: Array<string>,
+  opts: SpawnOptions = {},
+): Promise<GitResults> {
+  let cmd = await spawn('git', args, opts);
+  return { stdout: cmd.stdout.trim(), code: cmd.code };
 }
 
 export async function getCommitsSince(ref: string) {
-  const gitCmd = await spawn('git', [
+  let { stdout } = await git([
     'rev-list',
     '--no-merges',
     '--abbrev-commit',
     `${ref}..HEAD`,
   ]);
-  return gitCmd.stdout.trim().split('\n');
+  return stdout.split('\n');
 }
 
 export async function getChangedFilesSince(
   ref: string,
   fullPath: boolean = false,
 ) {
-  const gitCmd = await spawn('git', ['diff', '--name-only', `${ref}..HEAD`]);
-  const files = gitCmd.stdout.trim().split('\n');
+  let { stdout } = await git(['diff', '--name-only', `${ref}..HEAD`]);
+  let files = stdout.split('\n');
   if (!fullPath) return files;
   return files.map(file => path.resolve(file));
 }
 
 export async function getBranchName() {
-  const gitCmd = await spawn('git', ['rev-parse', '--abrev-ref', 'HEAD']);
-  return gitCmd.stdout.trim().split('\n');
+  let { stdout } = await git(['rev-parse', '--abrev-ref', 'HEAD']);
+  return stdout.split('\n');
 }
 
 export async function add(pathToFile: string) {
-  const gitCmd = await spawn('git', ['add', pathToFile]);
-  return gitCmd.code === 0;
+  let { code } = await git(['add', pathToFile]);
+  return code === 0;
 }
 
 export async function commit(message: string) {
-  const gitCmd = await spawn('git', ['commit', '-m', message, '--allow-empty']);
-  return gitCmd.code === 0;
+  let { code } = await git(['commit', '-m', message, '--allow-empty']);
+  return code === 0;
 }
 
 export async function push(args: Array<string> = []) {
-  const gitCmd = await spawn('git', ['push', ...args]);
-  return gitCmd.code === 0;
+  let { code } = await git(['push', ...args]);
+  return code === 0;
+}
+
+function parseCommitHashLine(line: string) {
+  return line.replace('commit ', '').trim();
+}
+
+function parseCommitAuthorLine(line: string) {
+  return line.replace('Author: ', '');
+}
+
+function parseCommitDateLine(line: string) {
+  return new Date(line.replace('Date: ', '').trim());
+}
+
+function parseCommitMessageLines(lines: Array<string>) {
+  return (
+    lines
+      // remove the extra padding added by git show
+      .map(line => line.replace('    ', ''))
+      .join('\n')
+      // There is one more extra line added by git
+      .trim()
+  );
 }
 
 export async function getFullCommit(ref: string) {
-  const gitCmd = await spawn('git', ['show', ref]);
-  const lines = gitCmd.stdout.trim().split('\n');
+  let { stdout } = await git(['show', ref]);
+  let lines = stdout.split('\n');
 
-  const hash = lines
-    .shift()
-    .replace('commit ', '')
-    .substring(0, 7);
-  const author = lines.shift().replace('Author: ', '');
-  const date = new Date(
-    lines
-      .shift()
-      .replace('Date: ', '')
-      .trim(),
-  );
+  let hash = parseCommitHashLine(lines.shift());
+  let author = parseCommitAuthorLine(lines.shift());
+  let date = parseCommitDateLine(lines.shift());
+  let message = parseCommitMessageLines(lines);
 
-  // remove the extra padding added by git show
-  const message = lines
-    .map(line => line.replace('    ', ''))
-    .join('\n')
-    .trim(); // There is one more extra line added by git
   return {
     commit: hash,
     author,
@@ -79,14 +101,12 @@ export async function getFullCommit(ref: string) {
 }
 
 export async function getLastPublishCommit() {
-  const isPublishCommit = msg => msg.startsWith('RELEASING: ');
+  let { stdout } = await git(['log', '-n', '50', '--oneline']);
+  let results = commits.parseCommitLines(stdout);
 
-  const gitCmd = await spawn('git', ['log', '-n', '50', '--oneline']);
-  const result = gitCmd.stdout
-    .trim()
-    .split('\n')
-    .map(line => parseCommitLine(line));
-  const latestPublishCommit = result.find(res => isPublishCommit(res.message));
+  let latestPublishCommit = results.find(res =>
+    commits.isPublishCommit(res.message),
+  );
 
   if (!latestPublishCommit) {
     return null;
@@ -96,21 +116,18 @@ export async function getLastPublishCommit() {
 }
 
 export async function getChangesetCommitsSince(ref: string) {
-  const isChangesetCommit = msg => msg.startsWith('CHANGESET: ');
+  let { stdout } = await git(['log', `${ref}...`, '--oneline']);
+  if (stdout.length === 0) return [];
+  let results = commits.parseCommitLines(stdout);
 
-  const gitCmd = await spawn('git', ['log', `${ref}...`, '--oneline']);
-  const result = gitCmd.stdout.trim();
+  let changesetCommits = results.filter(res =>
+    commits.isChangesetCommit(res.message),
+  );
 
-  if (result.length === 0) return [];
-
-  const parsedResults = result.split('\n').map(line => parseCommitLine(line));
-  const changesetCommits = parsedResults
-    .filter(res => isChangesetCommit(res.message))
-    .map(res => res.commit);
-
-  return changesetCommits;
+  return changesetCommits.map(res => res.commit);
 }
 
 export async function getFirstCommit(opts: { cwd?: string } = {}) {
-  return spawn('git', ['rev-list', '--max-parents=0', 'HEAD'], opts);
+  let { stdout } = await git(['rev-list', '--max-parents=0', 'HEAD'], opts);
+  // ...
 }
