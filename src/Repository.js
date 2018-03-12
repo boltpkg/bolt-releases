@@ -18,19 +18,16 @@ export default class Repository {
   }
 
   async getChangedPackages(): Promise<Array<Package>> {
-    // ...
-    return [];
+    const allPackages = this.packages;
+    const somePackages = allPackages.slice(0, 2);
+    return somePackages;
   }
 
   async getDependentPackages(
     packages: Array<Package>,
   ): Promise<Array<Package>> {
     // ...
-    return [];
-  }
-
-  async getReleaseNotes(): Promise<Array<string>> {
-    // ...
+    console.log(packages);
     return [];
   }
 }

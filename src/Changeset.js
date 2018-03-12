@@ -4,6 +4,9 @@ import type { Package } from './types';
 
 export default class Changeset {
   repo: Repository;
+  summary: string;
+  changedVersionsMap: Map<Package, string>;
+  dependentVersionsMap: Map<Package, string>;
 
   constructor(repo: Repository) {
     this.repo = repo;

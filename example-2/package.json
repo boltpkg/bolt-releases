@@ -1,0 +1,19 @@
+{
+  "private": true,
+  "name": "fixture-project",
+  "bolt": {
+    "workspaces": [
+      "packages/*"
+    ]
+  },
+  "scripts": {
+    "clean": "rm -rf **/node_modules"
+  },
+  "dependencies": {
+    "@atlaskit/layer": "^2.5.6",
+    "chalk": "^2.2.0",
+    "inquirer": "^3.3.0",
+    "left-pad": "^1.0.0",
+    "react": "15.6.1"
+  }
+}

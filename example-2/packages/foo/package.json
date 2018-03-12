@@ -1,0 +1,19 @@
+{
+  "name": "@atlaskit/avatar",
+  "version": "1.0.44",
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "echo preinstall",
+    "postinstall": "echo postinstall",
+    "prepublish": "echo prepublish"
+  },
+  "bolt": {
+    "workspaces": [
+      "packages/*"
+    ]
+  },
+  "dependencies": {
+    "inquirer": "^3.3.0",
+    "react": "15.6.1"
+  }
+}

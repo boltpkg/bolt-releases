@@ -34,7 +34,10 @@ export async function getChangedFilesSince(
   ref: string,
   fullPath: boolean = false,
 ) {
-  let { stdout } = await git(['diff', '--name-only', `${ref}..HEAD`]);
+  // First we need to find the commit where we diverged from `ref` at using `git merge-base`
+  let cmd = await git(['merge-base', ref, 'HEAD']);
+  const divergedAt = cmd.stdout.trim();
+  let { stdout } = await git(['diff', '--name-only', divergedAt]);
   let files = stdout.split('\n');
   if (!fullPath) return files;
   return files.map(file => path.resolve(file));
